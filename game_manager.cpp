@@ -47,6 +47,10 @@ bool GameManager::initialize() {
 }
 
 void GameManager::run() {
+    if (!showMenu()) {
+        return;
+    }
+
     cv::Mat frame;
     while (gameRunning && cap.read(frame)) {
         cv::flip(frame, frame, 1);
@@ -417,5 +421,38 @@ void GameManager::showTransitionScreen(bool isFinalBoss) {
 
         cv::imshow("Monster Shooter", countdown);
         cv::waitKey(1000);
+    }
+}
+
+bool GameManager::showMenu() {
+    cv::Mat menuScreen = background.clone();
+    std::string title = "MONSTER SHOOTER";
+    std::string option1 = "1 - Iniciar Jogo";
+    std::string option2 = "2 - Sair";
+
+    int fontFace = cv::FONT_HERSHEY_SIMPLEX;
+    double fontScale = 1.2;
+    int thickness = 3;
+
+    // Centraliza o título
+    int baseline = 0;
+    cv::Size titleSize = cv::getTextSize(title, fontFace, fontScale, thickness, &baseline);
+    cv::Point titleOrg((menuScreen.cols - titleSize.width) / 2, 150);
+
+    cv::putText(menuScreen, title, titleOrg, fontFace, fontScale, cv::Scalar(0,255,255), thickness);
+
+    // Opções
+    cv::putText(menuScreen, option1, cv::Point(180, 250), fontFace, 0.8, cv::Scalar(255,255,255), 2);
+    cv::putText(menuScreen, option2, cv::Point(180, 300), fontFace, 0.8, cv::Scalar(255,255,255), 2);
+
+    cv::imshow("Monster Shooter", menuScreen);
+
+    while (true) {
+        int key = cv::waitKey(0);
+        if (key == '1' || key == 49) { // 49 = teclado numérico '1'
+            return true;
+        } else if (key == '2' || key == 50 || key == 27) { // 50 = '2', 27 = ESC
+            return false;
+        }
     }
 }

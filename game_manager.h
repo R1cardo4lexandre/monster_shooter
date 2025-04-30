@@ -57,7 +57,7 @@ public:
     void saveHighScore();   // Função para salvar o recorde
     int loadHighScore();    // Função para carregar o recorde
     void showTransitionScreen(bool isFinalBoss);
-    
+    bool showMenu();
 
 private:
     void spawnHorde();

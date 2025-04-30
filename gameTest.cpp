@@ -1,26 +1,21 @@
 #include <opencv2/opencv.hpp>
 #include <iostream>
-#include <cstdlib> // Para o comando system()
-#include <random>  // Para gerar movimento aleatório
+#include <fstream>
+#include <cstdlib>
+#include <random>
 
 using namespace cv;
 using namespace std;
 
-// Função para desenhar uma imagem transparente sobre um quadro
 void drawImage(Mat frame, Mat img, int xPos, int yPos) {
     int startX = max(0, xPos);
     int startY = max(0, yPos);
     int endX = min(frame.cols, xPos + img.cols);
     int endY = min(frame.rows, yPos + img.rows);
-
-    if (startX >= endX || startY >= endY)
-        return;
-
+    if (startX >= endX || startY >= endY) return;
     Rect roiDest(startX, startY, endX - startX, endY - startY);
     Rect roiSrc(max(0, -xPos), max(0, -yPos), roiDest.width, roiDest.height);
-
     Mat imgCropped = img(roiSrc);
-
     if (imgCropped.channels() == 4) {
         Mat mask;
         vector<Mat> layers;
@@ -35,14 +30,12 @@ void drawImage(Mat frame, Mat img, int xPos, int yPos) {
 }
 
 int main() {
-    // Carregar o background
-    Mat background = imread("space.jpg"); // Substitua pelo caminho para sua imagem de fundo
+    Mat background = imread("space.jpg");
     if (background.empty()) {
         cout << "Erro ao carregar o background!" << endl;
         return -1;
     }
 
-    // Carregar a imagem interativa (PNG com transparência)
     Mat interactiveImg = imread("meramon.png", IMREAD_UNCHANGED);
     if (interactiveImg.empty()) {
         cout << "Erro ao carregar a imagem interativa!" << endl;
@@ -50,45 +43,38 @@ int main() {
     }
 
     resize(interactiveImg, interactiveImg, Size(100, 100));
-
-    // Inicializar a captura de vídeo
     VideoCapture cap(0);
     if (!cap.isOpened()) {
         cout << "Erro ao acessar a câmera!" << endl;
         return -1;
     }
 
-    // Faixa de cor para detecção (verde)
-    Scalar lowerGreen(35, 50, 50);   // Limite inferior (Hue, Saturation, Value)
-    Scalar upperGreen(85, 255, 255); // Limite superior (Hue, Saturation, Value)
-
-    Point2f smoothedCenter(0, 0);
-    Point2f lastCenter(0, 0);
+    Scalar lowerGreen(35, 50, 50);
+    Scalar upperGreen(85, 255, 255);
+    Point2f smoothedCenter(0, 0), lastCenter(0, 0);
     float smoothingFactor = 0.2;
+    int x = 50, y = 50, dx = 5, dy = 5;
+    bool monsterAlive = true;
 
-    // Variáveis para o movimento do monstrinho
-    int x = 50, y = 50; // Posição inicial
-    int dx = 5, dy = 5; // Direção e velocidade do movimento
-    bool monsterAlive = true; // O monstrinho está vivo
+    int score = 0;
+    int recorde = 0;
 
-    // Criar a janela para exibição
+    // ✅ Ler recorde do arquivo
+    ifstream recFile("recorde.txt");
+    if (recFile.is_open()) {
+        recFile >> recorde;
+        recFile.close();
+    }
+
     namedWindow("Deteccao de Cor com Interacao");
 
     while (true) {
         Mat frame, hsvFrame, mask;
-
         cap >> frame;
         if (frame.empty()) break;
-
-        // Espelhar a imagem horizontalmente
-        flip(frame, frame, 1); // 1 significa espelhamento horizontal
-
+        flip(frame, frame, 1);
         cvtColor(frame, hsvFrame, COLOR_BGR2HSV);
-
-        // Criar máscara para os pixels dentro da faixa de verde
         inRange(hsvFrame, lowerGreen, upperGreen, mask);
-
-        // Melhorar a máscara com operações morfológicas
         Mat kernel = getStructuringElement(MORPH_RECT, Size(5, 5));
         morphologyEx(mask, mask, MORPH_CLOSE, kernel);
         morphologyEx(mask, mask, MORPH_OPEN, kernel);
@@ -99,74 +85,76 @@ int main() {
         Point2f center(0, 0);
         int totalPoints = 0;
         if (!contours.empty()) {
-            for (const auto& contour : contours) {
+            for (const auto& contour : contours)
                 for (const auto& point : contour) {
                     center += Point2f(point);
                     totalPoints++;
                 }
-            }
-
             center.x /= totalPoints;
             center.y /= totalPoints;
-
             smoothedCenter = smoothedCenter * (1 - smoothingFactor) + center * smoothingFactor;
             lastCenter = smoothedCenter;
         } else {
             smoothedCenter = lastCenter;
         }
 
-        // Criar uma cópia do background para desenhar os elementos
         Mat output = background.clone();
-
-        // Desenhar o círculo no local detectado
         if (totalPoints > 0) {
             circle(output, smoothedCenter, 20, Scalar(0, 255, 0), 2);
         }
 
-        // Atualizar a posição do monstrinho (se ele estiver vivo)
         bool collisionDetected = false;
         if (monsterAlive) {
             x += dx;
             y += dy;
-
-            // Verificar colisão com as bordas da janela
             if (x <= 0 || x + interactiveImg.cols >= output.cols) dx = -dx;
             if (y <= 0 || y + interactiveImg.rows >= output.rows) dy = -dy;
-
-            // Desenhar o monstrinho
             drawImage(output, interactiveImg, x, y);
 
-            // Verificar interseção entre o círculo e o monstrinho
             Rect interactiveRect(x, y, interactiveImg.cols, interactiveImg.rows);
             if (totalPoints > 0) {
                 Rect detectionRect(smoothedCenter.x - 20, smoothedCenter.y - 20, 40, 40);
                 if ((detectionRect & interactiveRect).area() > 0) {
                     collisionDetected = true;
-                    // Retângulo REMOVIDO para evitar exibição
                 }
             }
         }
 
-        // Verificar tecla SPACE para reproduzir som e eliminar o monstrinho
-        int key = waitKey(30);
-        if (key == 27) break; // Tecla ESC para sair
+        // Mostrar pontuação e recorde
+        putText(output, "Score: " + to_string(score), Point(20, 40),
+                FONT_HERSHEY_SIMPLEX, 1, Scalar(255, 255, 255), 2);
+        putText(output, "Recorde: " + to_string(recorde), Point(20, 80),
+                FONT_HERSHEY_SIMPLEX, 1, Scalar(255, 255, 0), 2);
 
-        if (key == 32) { // Tecla SPACE para executar som
+        int key = waitKey(30);
+        if (key == 27) break;
+
+        if (key == 32) {
             cout << "Tecla SPACE pressionada. Executando som..." << endl;
-            system("mplayer tiro.wav &"); // Executa o som (certifique-se de que mplayer está instalado e 'tiro.wav' existe)
+            system("mplayer tiro.wav &");
 
             if (collisionDetected && monsterAlive) {
                 cout << "Interseção detectada! Monstrinho eliminado!" << endl;
-                monsterAlive = false; // Eliminar o monstrinho
+                monsterAlive = false;
+                score++;  // Aumenta pontuação
             }
         }
 
-        // Exibir o resultado
         imshow("Deteccao de Cor com Interacao", output);
     }
 
     cap.release();
     destroyAllWindows();
+
+    ofstream recFileOut("recorde.txt");
+    if (recFileOut.is_open()) {
+        int maiorPontuacao = max(score, recorde);
+        recFileOut << maiorPontuacao;
+        recFileOut.close();
+        cout << "Recorde salvo em 'recorde.txt': " << maiorPontuacao << endl;
+    } else {
+        cout << "Erro ao salvar o recorde." << endl;
+    }
 
     return 0;
 }

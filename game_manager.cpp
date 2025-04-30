@@ -3,6 +3,7 @@
 #include <cstdlib>
 #include <algorithm>
 #include <ctime>
+#include <fstream>  // Para manipulação de arquivos
 
 GameManager::GameManager() : 
     hordeNumber(1), monstersKilled(0), totalMonstersDefeated(0),
@@ -167,13 +168,16 @@ void GameManager::updateGameState() {
         return;
     }
 
+    int previousMonsterCount = monsters.size();
+
     monsters.erase(
         std::remove_if(monsters.begin(), monsters.end(),
             [](const Monster& m) { return m.shouldRemove(); }),
         monsters.end());
-    
-    monstersKilled = (hordeSize - monsters.size());
-    totalMonstersDefeated += monstersKilled;
+
+    int monstersEliminatedThisFrame = previousMonsterCount - monsters.size();
+    monstersKilled += monstersEliminatedThisFrame;  // Incrementa a contagem correta de monstros eliminados
+    totalMonstersDefeated += monstersEliminatedThisFrame;
 
     if (finalBossSpawned && monsters.empty()) {
         gameWon = true;
@@ -198,14 +202,23 @@ void GameManager::updateGameState() {
     }
 }
 
+
 void GameManager::render(cv::Mat& output) {
+    int highScore = loadHighScore();
+
     std::string status = "Horda: " + std::to_string(hordeNumber) + 
                        "/" + std::to_string(MAX_HORDES) +
                        " | Monstros: " + std::to_string(monsters.size()) +
                        " | Erros: " + std::to_string(missedShots) +
                        "/" + std::to_string(MAX_MISSED_SHOTS);
+                       
+                       std::string highScoreText = "Recorde: " + std::to_string(highScore);
+
     cv::putText(output, status, cv::Point(10, 30), 
                cv::FONT_HERSHEY_SIMPLEX, 0.7, cv::Scalar(255, 255, 255), 2);
+
+    cv::putText(output, highScoreText, cv::Point(10, 60), 
+                cv::FONT_HERSHEY_SIMPLEX, 0.7, cv::Scalar(255, 255, 255), 2);
 
     for (auto& monster : monsters) {
         monster.update(output.size());
@@ -267,6 +280,8 @@ void GameManager::showVictoryScreen() {
     
     cv::imshow("Monster Shooter", screen);
     cv::waitKey(5000);
+
+    saveHighScore(); // Salva a pontuação mais alta
 }
 
 void GameManager::showDefeatScreen(const std::string& reason) {
@@ -288,6 +303,8 @@ void GameManager::showDefeatScreen(const std::string& reason) {
     
     cv::imshow("Monster Shooter", screen);
     cv::waitKey(5000);
+
+    saveHighScore(); // Salva a pontuação mais alta
 }
 
 unsigned int GameManager::getMaxHordes() const { return MAX_HORDES; }
@@ -297,4 +314,33 @@ bool GameManager::isGameRunning() const { return gameRunning; }
 bool GameManager::isGameWon() const { return gameWon; }
 unsigned int GameManager::getHordeNumber() const { return hordeNumber; }
 unsigned int GameManager::getMonstersKilled() const { return monstersKilled; }
-unsigned int GameManager::getTotalMonstersDefeated() const { return totalMonstersDefeated; }
+unsigned int GameManager::getTotalMonstersDefeated() const {return totalMonstersDefeated; }
+
+void GameManager::saveHighScore() {
+    int currentScore = totalMonstersDefeated; // ou qualquer métrica de pontuação que você queira usar
+    int highScore = loadHighScore();
+
+    // Verifique se a pontuação atual é maior que o recorde
+    if (currentScore > highScore) {
+        std::ofstream outFile("recorde.txt");
+        if (outFile.is_open()) {
+            outFile << currentScore;
+            outFile.close();
+            std::cout << "Novo recorde! Pontuação salva: " << currentScore << std::endl;
+        } else {
+            std::cerr << "Erro ao salvar o recorde!" << std::endl;
+        }
+    }
+}
+
+int GameManager::loadHighScore() {
+    int highScore = 0;
+    std::ifstream inFile("recorde.txt");
+    if (inFile.is_open()) {
+        inFile >> highScore;
+        inFile.close();
+    } else {
+        std::cout << "Nenhum recorde encontrado, criando um novo arquivo." << std::endl;
+    }
+    return highScore;
+}

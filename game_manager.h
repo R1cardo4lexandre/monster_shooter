@@ -50,6 +50,9 @@ public:
     unsigned int getMissedShots() const;
     unsigned int getMaxMissedShots() const;
     unsigned int getMaxHordes() const;
+    void saveHighScore();   // Função para salvar o recorde
+    int loadHighScore();    // Função para carregar o recorde
+    
 
 private:
     void spawnHorde();

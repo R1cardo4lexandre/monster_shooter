@@ -4,6 +4,7 @@
 #include <opencv2/opencv.hpp>
 #include <vector>
 #include <string>
+#include <chrono>
 #include "monster.h"
 
 class GameManager {
@@ -18,10 +19,13 @@ private:
     const unsigned int MAX_HORDES = 10;
     const unsigned int MAX_MONSTERS = 30;
     const unsigned int FINAL_BOSS_HORDE = 10;
+    std::chrono::steady_clock::time_point roundStartTime;
+    const int ROUND_DURATION_SECONDS = 7; // duração da rodada
+
     
     unsigned int shotsFired;
     unsigned int missedShots;
-    const unsigned int MAX_MISSED_SHOTS = 15;
+    const unsigned int MAX_MISSED_SHOTS = 5;
     
     int hordeSize;
     int baseSpeed;
@@ -52,6 +56,7 @@ public:
     unsigned int getMaxHordes() const;
     void saveHighScore();   // Função para salvar o recorde
     int loadHighScore();    // Função para carregar o recorde
+    void showTransitionScreen(bool isFinalBoss);
     
 
 private:

@@ -126,6 +126,8 @@ void GameManager::spawnHorde() {
         monsters.emplace_back(monsterImg, cv::Point(x, y), cv::Point(dx, dy));
     }
     showHordaInfo();
+    roundStartTime = std::chrono::steady_clock::now();
+
 }
 
 void GameManager::spawnFinalBoss() {
@@ -141,6 +143,8 @@ void GameManager::spawnFinalBoss() {
     
     std::cout << "\n=== HORDA FINAL ===" << std::endl;
     std::cout << "CHEFE FINAL APARECEU!" << std::endl;
+    roundStartTime = std::chrono::steady_clock::now();
+
 }
 
 void GameManager::fireShot() {
@@ -196,37 +200,69 @@ void GameManager::updateGameState() {
 
     if (monsters.empty() && !finalBossSpawned) {
         hordeNumber++;
+    
+        bool isFinalBoss = (hordeNumber > MAX_HORDES);
+        showTransitionScreen(isFinalBoss);
+    
         if (hordeNumber <= MAX_HORDES) {
             spawnHorde();
         } else {
             spawnFinalBoss();
         }
     }
+    // Checa se o tempo da rodada acabou
+    auto now = std::chrono::steady_clock::now();
+    int elapsedSeconds = std::chrono::duration_cast<std::chrono::seconds>(now - roundStartTime).count();
+    if (elapsedSeconds >= ROUND_DURATION_SECONDS && !monsters.empty()) {
+        gameRunning = false;
+        showDefeatScreen("Tempo esgotado!");
+        return;
+    }
+    
 }
 
 
 void GameManager::render(cv::Mat& output) {
+    auto now = std::chrono::steady_clock::now();  // Declarar 'now' primeiro
+    int elapsedSeconds = std::chrono::duration_cast<std::chrono::seconds>(now - roundStartTime).count();
+    int timeRemaining = std::max(0, ROUND_DURATION_SECONDS - elapsedSeconds);
+
     int highScore = loadHighScore();
 
     std::string status = "Horda: " + std::to_string(hordeNumber) + 
-                       "/" + std::to_string(MAX_HORDES) +
-                       " | Monstros: " + std::to_string(monsters.size()) +
-                       " | Erros: " + std::to_string(missedShots) +
-                       "/" + std::to_string(MAX_MISSED_SHOTS);
-                       
-                       std::string highScoreText = "Recorde: " + std::to_string(highScore);
+                         "/" + std::to_string(MAX_HORDES) +
+                         " | Monstros: " + std::to_string(monsters.size()) +
+                         " | Erros: " + std::to_string(missedShots) +
+                         "/" + std::to_string(MAX_MISSED_SHOTS);
 
+    std::string highScoreText = "Recorde: " + std::to_string(highScore);
+    std::string timerText = "Tempo: " + std::to_string(timeRemaining) + "s";
+
+    // Mostrar status e recorde
     cv::putText(output, status, cv::Point(10, 30), 
-               cv::FONT_HERSHEY_SIMPLEX, 0.7, cv::Scalar(255, 255, 255), 2);
+                cv::FONT_HERSHEY_SIMPLEX, 0.7, cv::Scalar(255, 255, 255), 2);
 
     cv::putText(output, highScoreText, cv::Point(10, 60), 
                 cv::FONT_HERSHEY_SIMPLEX, 0.7, cv::Scalar(255, 255, 255), 2);
 
+    // Mostrar monstros
     for (auto& monster : monsters) {
         monster.update(output.size());
         monster.draw(output);
     }
+
+    // Mostrar tempo restante no canto superior direito
+    int fontFace = cv::FONT_HERSHEY_SIMPLEX;
+    double fontScale = 0.6;
+    int thickness = 1;
+    int baseline = 0;
+
+    cv::Size textSize = cv::getTextSize(timerText, fontFace, fontScale, thickness, &baseline);
+    cv::Point textOrg(output.cols - textSize.width - 10, 25);
+
+    cv::putText(output, timerText, textOrg, fontFace, fontScale, cv::Scalar(255, 255, 255), thickness);
 }
+
 
 void GameManager::handleInput(int key) {
     if (key == 27) { // ESC
@@ -345,4 +381,41 @@ int GameManager::loadHighScore() {
         std::cout << "Nenhum recorde encontrado, criando um novo arquivo." << std::endl;
     }
     return highScore;
+}
+
+void GameManager::showTransitionScreen(bool isFinalBoss) {
+    cv::Mat screen = background.clone();
+
+    std::string message = isFinalBoss ? "PREPARE-SE PARA O CHEFE FINAL!" :
+                                        "PREPARE-SE PARA A PROXIMA HORDA!";
+    
+    int fontFace = cv::FONT_HERSHEY_SIMPLEX;
+    double messageFontScale = 0.8;
+    int messageThickness = 2;
+    int baseY = 200;
+
+    // Calcula tamanho da mensagem para centralizar
+    int messageBaseline = 0;
+    cv::Size messageSize = cv::getTextSize(message, fontFace, messageFontScale, messageThickness, &messageBaseline);
+    cv::Point messagePos((screen.cols - messageSize.width) / 2, baseY);
+
+    cv::putText(screen, message, messagePos, fontFace, messageFontScale, cv::Scalar(0, 255, 255), messageThickness);
+
+    for (int i = 3; i > 0; --i) {
+        cv::Mat countdown = screen.clone();
+
+        std::string countText = std::to_string(i);
+        double countFontScale = 3.0;
+        int countThickness = 4;
+        int countBaseline = 0;
+
+        // Centraliza número da contagem
+        cv::Size countSize = cv::getTextSize(countText, fontFace, countFontScale, countThickness, &countBaseline);
+        cv::Point countPos((screen.cols - countSize.width) / 2, baseY + 100);
+
+        cv::putText(countdown, countText, countPos, fontFace, countFontScale, cv::Scalar(0, 255, 0), countThickness);
+
+        cv::imshow("Monster Shooter", countdown);
+        cv::waitKey(1000);
+    }
 }

@@ -3,7 +3,9 @@
 #include <cstdlib>
 #include <algorithm>
 #include <ctime>
-#include <fstream>  // Para manipulação de arquivos
+#include <fstream> 
+
+
 
 GameManager::GameManager() : 
     hordeNumber(1), monstersKilled(0), totalMonstersDefeated(0),

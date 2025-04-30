@@ -16,7 +16,7 @@ private:
     unsigned int monstersKilled;
     unsigned int totalMonstersDefeated;
     const unsigned int MAX_HORDES = 10;
-    const unsigned int MAX_MONSTERS = 20;
+    const unsigned int MAX_MONSTERS = 30;
     const unsigned int FINAL_BOSS_HORDE = 10;
     
     unsigned int shotsFired;

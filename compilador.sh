@@ -1,0 +1,1 @@
+g++ -std=c++11 *.cpp -o monster_shooter `pkg-config --cflags --libs opencv4`
